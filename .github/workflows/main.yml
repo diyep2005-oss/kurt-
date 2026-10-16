@@ -1,0 +1,49 @@
+name: Gokboru_Tarayici_Sekmeler_Indirme_Yoneticisi
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: Zip dosyasini ac ve proje klasorunu bul
+        run: |
+          unzip -q gokboru-android.zip -d proje
+          FOUND="$(find proje -name settings.gradle.kts | head -n 1)"
+          if [ -z "$FOUND" ]; then
+            echo "HATA: Zip icinde settings.gradle.kts bulunamadi"
+            find proje -maxdepth 3
+            exit 1
+          fi
+          echo "PROJE_DIZINI=$(dirname "$FOUND")" >> "$GITHUB_ENV"
+
+      - name: Java kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Android lisanslarini kabul et
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - name: Gradle kur
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: APK derle
+        run: |
+          cd "$PROJE_DIZINI"
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: APK dosyasini yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: gokboru-browser-apk
+          path: proje/**/build/outputs/apk/debug/*.apk
