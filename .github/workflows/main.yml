@@ -1,117 +1,50 @@
-
-
-name: Gokboru Browser APK Derle
+name: APK derle
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
-    name: Android APK Olustur
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
     steps:
-      - name: Depoyu indir
+      - name: Kodu indir
         uses: actions/checkout@v4
 
-      - name: Java 17 kur
+      - name: Zip dosyasini ac ve proje klasorunu bul
+        run: |
+          ZIP="gokboru-android.zip"
+          unzip -q "$ZIP" -d proje
+          FOUND="$(find proje -name settings.gradle.kts | head -n 1)"
+          if [ -z "$FOUND" ]; then
+            echo "Zip icinde settings.gradle.kts bulunamadi. Icerik:"
+            find proje | head -n 50
+            exit 1
+          fi
+          echo "PROJE_DIZINI=$(dirname "$FOUND")" >> "$GITHUB_ENV"
+
+      - name: Java kur
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
+
+      - name: Android lisanslarini kabul et
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
       - name: Gradle kur
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: "8.9"
 
-      - name: ZIP dosyasini bul ve projeyi ac
-        shell: bash
+      - name: APK derle
         run: |
-          set -e
+          cd "$PROJE_DIZINI"
+          gradle assembleDebug --no-daemon --stacktrace
 
-          mkdir -p proje
-
-          ZIP="$(find . -maxdepth 2 -type f \
-            \( -name 'gokboru-android__2.zip' \
-            -o -name 'gokboru-android.zip' \
-            -o -name '*.zip' \) \
-            ! -path './proje/*' \
-            -print -quit)"
-
-          if [ -z "$ZIP" ]; then
-            echo "HATA: Depoda ZIP dosyasi bulunamadi."
-            find . -maxdepth 3 -type f
-            exit 1
-          fi
-
-          echo "Bulunan ZIP: $ZIP"
-          unzip -q "$ZIP" -d proje
-
-          FOUND="$(find proje -type f \
-            \( -name settings.gradle \
-            -o -name settings.gradle.kts \) \
-            -print -quit)"
-
-          if [ -z "$FOUND" ]; then
-            echo "HATA: settings.gradle dosyasi bulunamadi."
-            find proje -maxdepth 5 -type f
-            exit 1
-          fi
-
-          PROJECT_DIR="$(dirname "$FOUND")"
-
-          echo "PROJE_DIZINI=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Proje bulundu: $PROJECT_DIR"
-          ls -la "$PROJECT_DIR"
-
-      - name: Android SDK kur
-        uses: android-actions/setup-android@v3
-
-      - name: Android SDK lisanslarini kabul et
-        run: yes | sdkmanager --licenses || true
-
-      - name: Gradle ile APK derle
-        run: |
-          gradle -p "$PROJE_DIZINI" \
-            assembleDebug \
-            --no-daemon \
-            --stacktrace
-
-      - name: APK dosyasini bul
-        shell: bash
-        run: |
-          set -e
-
-          APK="$(find "$PROJE_DIZINI" -type f \
-            -path '*/build/outputs/apk/*/*.apk' \
-            -print -quit)"
-
-          if [ -z "$APK" ]; then
-            echo "HATA: APK olusmadi."
-            find "$PROJE_DIZINI" -type f \
-              -path '*/build/outputs/*' -print
-            exit 1
-          fi
-
-          mkdir -p sonuc
-          cp "$APK" sonuc/Gokboru-Browser.apk
-
-          echo "APK hazir: sonuc/Gokboru-Browser.apk"
-          ls -lh sonuc/Gokboru-Browser.apk
-
-      - name: APK dosyasini indirilebilir yap
+      - name: APK dosyasini yukle
         uses: actions/upload-artifact@v4
         with:
-          name: Gokboru-Browser-APK
-          path: sonuc/Gokboru-Browser.apk
-          if-no-files-found: error
-          retention-days: 7
+          name: gokboru-browser-apk
+          path: proje/**/build/outputs/apk/debug/*.apk
