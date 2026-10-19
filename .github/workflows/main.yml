@@ -14,7 +14,7 @@ jobs:
 
       - name: Zip dosyasini ac ve proje klasorunu bul
         run: |
-          ZIP="gokboru-android(2)"
+          ZIP="gokboru-android(3]"
           unzip -q "$ZIP" -d proje
           FOUND="$(find proje -name settings.gradle.kts | head -n 1)"
           if [ -z "$FOUND" ]; then
